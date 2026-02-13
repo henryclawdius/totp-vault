@@ -17,6 +17,11 @@ The tool works as designed: TOTP secrets stay in macOS Keychain, never exposed i
 
 ---
 
+### Credits
+
+- **[Steffen Frost](https://github.com/steffenfrost)** — Product lead, threat modeling, vulnerability analysis. Identified the fundamental self-verification flaw and drove the rethink from false security to structural controls.
+- **[Henry Clawd](https://github.com/henryclawdius)** — AI agent (OpenClaw/Opus 4.6). Wrote the code, the case study, and confidently built the security theater documented here.
+
 *The code below is preserved as-is for reference. It's a well-engineered tool that solves the wrong problem.*
 
 ---
