@@ -213,12 +213,37 @@ extension String {
 
 // MARK: - CLI Commands
 
+// MARK: - Security Guards
+
+/// Ensures the command is being run from a real terminal (human at keyboard),
+/// not from a subprocess (like an AI agent). This prevents prompt injection
+/// attacks from adding/removing TOTP secrets.
+func requireHumanTerminal() throws {
+    // Check if stdin is a real TTY (terminal)
+    guard isatty(STDIN_FILENO) == 1 else {
+        print("🔒 Security: This command requires a real terminal (TTY).")
+        print("   It cannot be run from scripts, subprocesses, or AI agents.")
+        print("   Open Terminal.app and run it directly.")
+        throw ExitCode.failure
+    }
+    
+    // Check for common non-interactive environment variables
+    let suspiciousEnvVars = ["OPENCLAW_HOME", "OPENCLAW_SESSION", "NODE_CHANNEL_FD"]
+    for envVar in suspiciousEnvVars {
+        if ProcessInfo.processInfo.environment[envVar] != nil {
+            print("🔒 Security: Detected agent/automation environment (\(envVar)).")
+            print("   Secret management requires direct human access.")
+            throw ExitCode.failure
+        }
+    }
+}
+
 @main
 struct TOTPVault: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "totp-vault",
         abstract: "Secure TOTP code generator that never exposes secrets",
-        version: "1.0.0",
+        version: "1.1.0",
         subcommands: [Add.self, Remove.self, List.self, Get.self, Verify.self, Time.self]
     )
 }
@@ -232,6 +257,9 @@ struct Add: ParsableCommand {
     var name: String
     
     func run() throws {
+        // Security: only humans at a real terminal can add secrets
+        try requireHumanTerminal()
+        
         // Check if already exists
         let existing = try Keychain.listNames()
         if existing.contains(name) {
@@ -240,8 +268,6 @@ struct Add: ParsableCommand {
         }
         
         // Prompt for secret (hidden input)
-        print("Enter TOTP secret (base32): ", terminator: "")
-        
         // Disable echo for secret input
         var oldTermios = termios()
         tcgetattr(STDIN_FILENO, &oldTermios)
@@ -249,14 +275,30 @@ struct Add: ParsableCommand {
         newTermios.c_lflag &= ~UInt(ECHO)
         tcsetattr(STDIN_FILENO, TCSANOW, &newTermios)
         
+        print("Enter TOTP secret (base32): ", terminator: "")
         guard let secret = readLine(), !secret.isEmpty else {
             tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios)
             print("\nError: No secret provided")
             throw ExitCode.failure
         }
+        print() // newline after hidden input
+        
+        // Confirm secret (double-entry)
+        print("Confirm TOTP secret: ", terminator: "")
+        guard let confirm = readLine(), !confirm.isEmpty else {
+            tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios)
+            print("\nError: No confirmation provided")
+            throw ExitCode.failure
+        }
         
         tcsetattr(STDIN_FILENO, TCSANOW, &oldTermios)
         print() // newline after hidden input
+        
+        // Check they match
+        if secret != confirm {
+            print("Error: Secrets don't match. Try again.")
+            throw ExitCode.failure
+        }
         
         // Validate secret by generating a test code
         do {
@@ -281,6 +323,9 @@ struct Remove: ParsableCommand {
     var name: String
     
     func run() throws {
+        // Security: only humans at a real terminal can remove secrets
+        try requireHumanTerminal()
+        
         try Keychain.delete(name: name)
         print("✓ Removed '\(name)' from Keychain")
     }
