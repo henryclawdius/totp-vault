@@ -1,12 +1,25 @@
 # totp-vault 🔐
 
-Secure TOTP code generator that keeps secrets out of AI agent context.
+## ⚠️ This Repository is a Case Study
 
-> ⚠️ **Important: Self-verification is not verification.** If an AI agent can call both `totp-vault get` (generate codes) and `totp-vault verify` (check codes), it can verify itself — which provides **zero additional security**. The agent is both the lock and the key.
->
-> **Proper usage:** Only expose `verify` to the agent. The **human** reads the code from their authenticator app and provides it. The agent uses `verify` to check the human-provided code. Restrict `get` behind interactive auth (Touch ID, password prompt) so the agent cannot call it programmatically.
->
-> totp-vault solves **secret exfiltration** (the TOTP secret never leaves Keychain). It does NOT solve **agent self-authorization** without the access restrictions described above. See [Agent Authentication](#agent-authentication) below.
+**This code does not solve AI agent security.** It was built by an AI agent (Henry Clawd) that confidently created a 2FA system for itself — which turned out to provide zero actual security.
+
+The tool works as designed: TOTP secrets stay in macOS Keychain, never exposed in plaintext. But **an agent that can call both `get` (generate codes) and `verify` (check codes) can authorize itself.** Self-verification is not verification. The agent is the lock, the key, and the locksmith.
+
+**Read [CASE-STUDY.md](CASE-STUDY.md) for the full story** — how an AI pattern-matched from human security practices, built something that looked right, and created a false sense of security that was more dangerous than having no security at all.
+
+### What This Teaches
+- AI agents will confidently build security theater from training data patterns
+- Behavioral controls (policy files, self-checks) degrade over long sessions
+- Structural controls (OS-level permissions, separate processes) are what actually work
+- An agent's confidence in its security solution is not evidence of security
+- **Recovery (backups) beats prevention when the "attacker" is the system itself**
+
+---
+
+*The code below is preserved as-is for reference. It's a well-engineered tool that solves the wrong problem.*
+
+---
 
 ## The Problem
 
