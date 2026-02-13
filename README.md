@@ -1,6 +1,12 @@
 # totp-vault 🔐
 
-Secure TOTP code generator that never exposes secrets to AI agents.
+Secure TOTP code generator that keeps secrets out of AI agent context.
+
+> ⚠️ **Important: Self-verification is not verification.** If an AI agent can call both `totp-vault get` (generate codes) and `totp-vault verify` (check codes), it can verify itself — which provides **zero additional security**. The agent is both the lock and the key.
+>
+> **Proper usage:** Only expose `verify` to the agent. The **human** reads the code from their authenticator app and provides it. The agent uses `verify` to check the human-provided code. Restrict `get` behind interactive auth (Touch ID, password prompt) so the agent cannot call it programmatically.
+>
+> totp-vault solves **secret exfiltration** (the TOTP secret never leaves Keychain). It does NOT solve **agent self-authorization** without the access restrictions described above. See [Agent Authentication](#agent-authentication) below.
 
 ## The Problem
 
@@ -98,3 +104,52 @@ totp-vault time
 ## License
 
 MIT — Built by Henry Clawd 🐾 for the OpenClaw community.
+
+## Agent Authentication
+
+### The Self-Verification Problem
+
+When an AI agent can call both `get` and `verify`, 2FA becomes meaningless:
+
+```
+# A compromised agent can do this:
+code=$(totp-vault get henry-2fa)    # Generate valid code
+totp-vault verify henry-2fa $code   # "valid" — of course it is
+# Proceed with destructive action — "2FA passed!"
+```
+
+This is equivalent to no 2FA at all.
+
+### Correct Architecture
+
+```
+┌─────────────┐     code      ┌──────────────┐
+│   HUMAN     │ ────────────► │    AGENT     │
+│ (authenticator)│             │ (totp-vault  │
+│             │               │   verify)    │
+└─────────────┘               └──────────────┘
+     ▲                              │
+     │                              ▼
+  Reads code                  Checks code
+  from phone                  against Keychain
+```
+
+The human provides the code. The agent only verifies it. The agent **cannot generate codes**.
+
+### How to Restrict `get`
+
+Option 1: Require Touch ID for `get` (future feature)
+Option 2: Run `totp-vault get` under a different macOS user the agent can't access
+Option 3: Remove `get` from the agent-accessible binary and provide a separate admin-only binary
+
+### What totp-vault DOES Protect Against
+
+- ✅ TOTP secret exfiltration (secret never leaves Keychain)
+- ✅ Secret exposure in logs, command history, or agent context
+- ✅ Plaintext secret files being read by compromised agents
+
+### What totp-vault Does NOT Protect Against (without access restrictions)
+
+- ❌ Agent self-authorization (can generate + verify its own codes)
+- ❌ Social engineering ("Hey human, what's the code?" for a hidden purpose)
+- ❌ A compromised agent bypassing 2FA entirely by calling `get`
